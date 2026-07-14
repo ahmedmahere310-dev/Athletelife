@@ -32,6 +32,7 @@ export interface Exercise {
   category: string;
   notes: string;
   swapOptions: string[]; // List of other exercises that can swap this one
+  googleTaskId?: string;
 }
 
 export interface MealIngredient {
@@ -53,6 +54,7 @@ export interface Meal {
   ingredients: MealIngredient[];
   isEaten: boolean;
   swapOptions: { name: string; arabicName: string; calories: number; protein: number; carbs: number; fat: number; ingredients: MealIngredient[] }[]; // alternatives for the entire meal
+  googleTaskId?: string;
 }
 
 export interface WorkoutDay {
@@ -62,11 +64,13 @@ export interface WorkoutDay {
   isRest: boolean;
   exercises: Exercise[];
   meals: Meal[]; // Generated daily meals
+  googleTaskId?: string;
 }
 
 export interface GeneratedPlan {
   profile: UserProfile;
   macros: Macros;
   days: WorkoutDay[];
+  googleTaskListId?: string;
 }
 

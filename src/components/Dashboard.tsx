@@ -7,26 +7,29 @@ import React, { useState } from 'react';
 import { GeneratedPlan, WorkoutDay } from '../types';
 import WorkoutPlanner from './WorkoutPlanner';
 import NutritionDashboard from './NutritionDashboard';
+import GoogleTasksSync from './GoogleTasksSync';
 import { 
   Dumbbell, 
   Flame, 
   Activity, 
   RotateCcw, 
   Scale, 
-  Award
+  Award,
+  CheckSquare
 } from 'lucide-react';
 
 interface DashboardProps {
   plan: GeneratedPlan;
   onUpdateDays: (updatedDays: WorkoutDay[]) => void;
+  onUpdatePlan: (updatedPlan: GeneratedPlan) => void;
   onReset: () => void;
   isArabic: boolean;
   isScrolled?: boolean;
 }
 
-type TabType = 'workout' | 'nutrition';
+type TabType = 'workout' | 'nutrition' | 'googleTasks';
 
-export default function Dashboard({ plan, onUpdateDays, onReset, isArabic, isScrolled = false }: DashboardProps) {
+export default function Dashboard({ plan, onUpdateDays, onUpdatePlan, onReset, isArabic, isScrolled = false }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('workout');
   const { profile, macros, days } = plan;
 
@@ -35,6 +38,7 @@ export default function Dashboard({ plan, onUpdateDays, onReset, isArabic, isScr
     en: {
       workoutTab: "Training Program",
       nutritionTab: "Nutrition & Macros",
+      googleTasksTab: "Google Tasks Sync",
       welcome: "Welcome back,",
       reset: "Reset Plan",
       level: "Level",
@@ -52,6 +56,7 @@ export default function Dashboard({ plan, onUpdateDays, onReset, isArabic, isScr
     ar: {
       workoutTab: "الجدول الرياضي",
       nutritionTab: "التغذية والسعرات",
+      googleTasksTab: "مزامنة جوجل",
       welcome: "أهلاً بك مجدداً،",
       reset: "إعادة تعيين الخطة",
       level: "المستوى",
@@ -211,15 +216,30 @@ export default function Dashboard({ plan, onUpdateDays, onReset, isArabic, isScr
           <Flame size={16} />
           <span>{currentT.nutritionTab}</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('googleTasks')}
+          className={`px-5 py-3 text-sm font-semibold transition border-b-2 flex items-center gap-2 shrink-0 ${
+            activeTab === 'googleTasks'
+              ? 'border-emerald-500 text-white bg-emerald-500/5'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <CheckSquare size={16} />
+          <span>{currentT.googleTasksTab}</span>
+        </button>
       </div>
 
       {/* Primary Workspace Viewport */}
       <div className="transition-all duration-300">
         {activeTab === 'workout' && (
-          <WorkoutPlanner days={days} onUpdateDays={onUpdateDays} isArabic={isArabic} />
+          <WorkoutPlanner days={days} onUpdateDays={onUpdateDays} isArabic={isArabic} googleTaskListId={plan.googleTaskListId} />
         )}
         {activeTab === 'nutrition' && (
-          <NutritionDashboard days={days} onUpdateDays={onUpdateDays} macros={macros} profile={profile} isArabic={isArabic} />
+          <NutritionDashboard days={days} onUpdateDays={onUpdateDays} macros={macros} profile={profile} isArabic={isArabic} googleTaskListId={plan.googleTaskListId} />
+        )}
+        {activeTab === 'googleTasks' && (
+          <GoogleTasksSync plan={plan} onUpdatePlan={onUpdatePlan} isArabic={isArabic} />
         )}
       </div>
 

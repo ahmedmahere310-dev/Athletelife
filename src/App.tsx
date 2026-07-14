@@ -8,7 +8,8 @@ import { UserProfile, GeneratedPlan, WorkoutDay } from './types';
 import { calculateMacros, generateWorkoutPlan } from './utils/fitnessLogic';
 import OnboardingForm from './components/OnboardingForm';
 import Dashboard from './components/Dashboard';
-import { Sparkles, Globe, LogOut, Dumbbell, RotateCcw, User } from 'lucide-react';
+import GoogleTasksSync from './components/GoogleTasksSync';
+import { Sparkles, Globe, LogOut, Dumbbell, RotateCcw, User, CheckSquare } from 'lucide-react';
 
 const STORAGE_KEY = 'athlete_lifeos_plan';
 const LANG_KEY = 'athlete_lifeos_lang';
@@ -17,6 +18,7 @@ export default function App() {
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
   const [isArabic, setIsArabic] = useState<boolean>(true); // Default to Arabic as requested by user's intro
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const [showTasksOnboarding, setShowTasksOnboarding] = useState<boolean>(false);
 
   // Monitor page scroll position to trigger sticky transitions
   useEffect(() => {
@@ -63,6 +65,12 @@ export default function App() {
 
     setPlan(newPlan);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newPlan));
+    setShowTasksOnboarding(true); // Trigger Google Tasks sync prompt!
+  };
+
+  const handleUpdatePlan = (updatedPlan: GeneratedPlan) => {
+    setPlan(updatedPlan);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPlan));
   };
 
   const handleUpdateDays = (updatedDays: WorkoutDay[]) => {
@@ -71,8 +79,7 @@ export default function App() {
       ...plan,
       days: updatedDays
     };
-    setPlan(newPlan);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newPlan));
+    handleUpdatePlan(newPlan);
   };
 
   const handleReset = () => {
@@ -191,13 +198,25 @@ export default function App() {
       {/* Main Content Viewport */}
       <main className="flex-grow flex flex-col items-center justify-center relative z-10 pb-16">
         {plan ? (
-          <Dashboard 
-            plan={plan} 
-            onUpdateDays={handleUpdateDays} 
-            onReset={handleReset} 
-            isArabic={isArabic} 
-            isScrolled={isScrolled}
-          />
+          <>
+            <Dashboard 
+              plan={plan} 
+              onUpdateDays={handleUpdateDays} 
+              onUpdatePlan={handleUpdatePlan}
+              onReset={handleReset} 
+              isArabic={isArabic} 
+              isScrolled={isScrolled}
+            />
+            {showTasksOnboarding && (
+              <GoogleTasksSync 
+                plan={plan} 
+                onUpdatePlan={handleUpdatePlan} 
+                isArabic={isArabic} 
+                showOnboardingPromptInitially={true} 
+                onClose={() => setShowTasksOnboarding(false)} 
+              />
+            )}
+          </>
         ) : (
           <OnboardingForm 
             onComplete={handleOnboardingComplete} 

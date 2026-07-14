@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { WorkoutDay, Meal, MealIngredient, Macros, UserProfile } from '../types';
+import { getAccessToken, syncMealToGoogleTasks } from '../utils/googleTasksService';
 import { 
   Flame, 
   Droplet, 
@@ -30,9 +31,10 @@ interface NutritionDashboardProps {
   macros: Macros;
   profile: UserProfile;
   isArabic: boolean;
+  googleTaskListId?: string;
 }
 
-export default function NutritionDashboard({ days, onUpdateDays, macros, profile, isArabic }: NutritionDashboardProps) {
+export default function NutritionDashboard({ days, onUpdateDays, macros, profile, isArabic, googleTaskListId }: NutritionDashboardProps) {
   const [activeDayIndex, setActiveDayIndex] = useState<number>(0);
   const [consumedWater, setConsumedWater] = useState<number>(0);
   const [activeSwapMealId, setActiveSwapMealId] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
     onUpdateDays(updatedDays);
   };
 
-  const handleSwapMeal = (mealId: string, swapToOption: any) => {
+  const handleSwapMeal = async (mealId: string, swapToOption: any) => {
     const updatedDays = days.map((day, idx) => {
       if (idx !== activeDayIndex) return day;
       return {
@@ -103,9 +105,43 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
     });
     onUpdateDays(updatedDays);
     setActiveSwapMealId(null);
+
+    // Ask user to sync to Google Tasks if they are logged in
+    const token = getAccessToken();
+    if (token && googleTaskListId) {
+      const activeUpdatedDay = updatedDays[activeDayIndex];
+      const updatedMeal = activeUpdatedDay.meals.find(m => m.id === mealId);
+      const mealIndex = activeUpdatedDay.meals.findIndex(m => m.id === mealId);
+      if (updatedMeal) {
+        const shouldSync = window.confirm(
+          isArabic 
+            ? "لقد قمت بتعديل الوجبة الغذائية. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
+            : "You modified the meal. Would you like to update and sync this new change to Google Tasks?"
+        );
+        if (shouldSync) {
+          try {
+            const updatedTask = await syncMealToGoogleTasks(token, googleTaskListId, updatedMeal, activeUpdatedDay.dayNumber, mealIndex, isArabic);
+            if (updatedTask && updatedTask.id) {
+              const finalDays = updatedDays.map((d, dIdx) => {
+                if (dIdx !== activeDayIndex) return d;
+                return {
+                  ...d,
+                  meals: d.meals.map(m => m.id === mealId ? { ...m, googleTaskId: updatedTask.id } : m)
+                };
+              });
+              onUpdateDays(finalDays);
+              alert(isArabic ? "تم تحديث الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal in Google Tasks!");
+            }
+          } catch (error) {
+            console.error("Error syncing meal to Google Tasks:", error);
+            alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing meal to Google Tasks.");
+          }
+        }
+      }
+    }
   };
 
-  const handleSwapIngredient = (mealId: string, ingredientIndex: number, swapToOption: any) => {
+  const handleSwapIngredient = async (mealId: string, ingredientIndex: number, swapToOption: any) => {
     const updatedDays = days.map((day, idx) => {
       if (idx !== activeDayIndex) return day;
       return {
@@ -143,6 +179,40 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
     });
     onUpdateDays(updatedDays);
     setActiveSwapIngredientKey(null);
+
+    // Ask user to sync to Google Tasks if they are logged in
+    const token = getAccessToken();
+    if (token && googleTaskListId) {
+      const activeUpdatedDay = updatedDays[activeDayIndex];
+      const updatedMeal = activeUpdatedDay.meals.find(m => m.id === mealId);
+      const mealIndex = activeUpdatedDay.meals.findIndex(m => m.id === mealId);
+      if (updatedMeal) {
+        const shouldSync = window.confirm(
+          isArabic 
+            ? "لقد قمت بتعديل مكونات الوجبة. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
+            : "You modified the meal ingredients. Would you like to update and sync this new change to Google Tasks?"
+        );
+        if (shouldSync) {
+          try {
+            const updatedTask = await syncMealToGoogleTasks(token, googleTaskListId, updatedMeal, activeUpdatedDay.dayNumber, mealIndex, isArabic);
+            if (updatedTask && updatedTask.id) {
+              const finalDays = updatedDays.map((d, dIdx) => {
+                if (dIdx !== activeDayIndex) return d;
+                return {
+                  ...d,
+                  meals: d.meals.map(m => m.id === mealId ? { ...m, googleTaskId: updatedTask.id } : m)
+                };
+              });
+              onUpdateDays(finalDays);
+              alert(isArabic ? "تم تحديث الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal ingredients in Google Tasks!");
+            }
+          } catch (error) {
+            console.error("Error syncing meal ingredients to Google Tasks:", error);
+            alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing to Google Tasks.");
+          }
+        }
+      }
+    }
   };
 
   const dayLabel = (name: string) => {

@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { WorkoutDay, Exercise } from '../types';
+import { getAccessToken, syncWorkoutDayToGoogleTasks } from '../utils/googleTasksService';
 import { 
   Dumbbell, 
   Check, 
@@ -20,9 +21,10 @@ interface WorkoutPlannerProps {
   days: WorkoutDay[];
   onUpdateDays: (updatedDays: WorkoutDay[]) => void;
   isArabic: boolean;
+  googleTaskListId?: string;
 }
 
-export default function WorkoutPlanner({ days, onUpdateDays, isArabic }: WorkoutPlannerProps) {
+export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTaskListId }: WorkoutPlannerProps) {
   const [activeDayIndex, setActiveDayIndex] = useState<number>(0);
   const [completedExercises, setCompletedExercises] = useState<Record<string, boolean>>({});
   const [activeSwapExerciseId, setActiveSwapExerciseId] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic }: Workout
     }));
   };
 
-  const handleSwapExercise = (exerciseId: string, swapToName: string) => {
+  const handleSwapExercise = async (exerciseId: string, swapToName: string) => {
     // Locate the exercise, swap its name, find if we can update notes, and update state
     const updatedDays = days.map(day => {
       return {
@@ -59,6 +61,36 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic }: Workout
 
     onUpdateDays(updatedDays);
     setActiveSwapExerciseId(null);
+
+    // Ask user to sync to Google Tasks if they are logged in
+    const token = getAccessToken();
+    if (token && googleTaskListId) {
+      const activeUpdatedDay = updatedDays[activeDayIndex];
+      const shouldSync = window.confirm(
+        isArabic 
+          ? "لقد قمت بتعديل جدول التمارين. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
+          : "You modified the workout routine. Would you like to update and sync this new change to Google Tasks?"
+      );
+      if (shouldSync) {
+        try {
+          const updatedTask = await syncWorkoutDayToGoogleTasks(token, googleTaskListId, activeUpdatedDay, isArabic);
+          if (updatedTask && updatedTask.id) {
+            // Save the newly created googleTaskId if any
+            const finalDays = updatedDays.map((d, idx) => {
+              if (idx === activeDayIndex) {
+                return { ...d, googleTaskId: updatedTask.id };
+              }
+              return d;
+            });
+            onUpdateDays(finalDays);
+            alert(isArabic ? "تم التحديث بنجاح في مهام جوجل!" : "Successfully updated in Google Tasks!");
+          }
+        } catch (error) {
+          console.error("Error syncing to Google Tasks:", error);
+          alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing to Google Tasks.");
+        }
+      }
+    }
   };
 
   const dayLabel = (name: string) => {
