@@ -665,6 +665,9 @@ export default function GoogleTasksSync({
                       isArabic ? `فشلت العملية: ${syncError}` : `Operation failed: ${syncError}`
                     )}
                   </p>
+                  <div className="mt-2 pt-2 border-t border-red-500/10 text-[10px] font-mono text-red-300/70 break-all select-all">
+                    <strong>Raw error / تفاصيل الخطأ:</strong> {syncError}
+                  </div>
                 </div>
               </div>
             </div>
