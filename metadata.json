@@ -1,0 +1,6 @@
+{
+  "name": "Athlete LifeOS",
+  "description": "Premium athletic planner generating custom workout splits and macronutrient distributions with interactive adjustments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
