@@ -69,6 +69,23 @@ export const getAccessToken = (): string | null => {
 // Google Tasks API Helpers
 const BASE_URL = 'https://tasks.googleapis.com/tasks/v1';
 
+// Helper to extract detailed Google API error messages
+const handleErrorResponse = async (response: Response, defaultMessage: string) => {
+  let errorMsg = defaultMessage;
+  try {
+    const errBody = await response.json();
+    if (errBody?.error?.message) {
+      errorMsg = errBody.error.message;
+    }
+  } catch {
+    try {
+      const text = await response.text();
+      if (text) errorMsg = `${defaultMessage}: ${text}`;
+    } catch {}
+  }
+  throw new Error(errorMsg);
+};
+
 // Get or Create the AthleteLifeOS Task List
 export const getOrCreateTaskList = async (token: string, isArabic: boolean): Promise<string> => {
   const listName = isArabic ? 'AthleteLifeOS - الوجبات والتمرينات' : 'AthleteLifeOS - Meals & Workouts';
@@ -80,7 +97,7 @@ export const getOrCreateTaskList = async (token: string, isArabic: boolean): Pro
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch task lists: ${response.statusText}`);
+      await handleErrorResponse(response, `Failed to fetch task lists`);
     }
     
     const data = await response.json();
@@ -101,7 +118,7 @@ export const getOrCreateTaskList = async (token: string, isArabic: boolean): Pro
     });
     
     if (!createResponse.ok) {
-      throw new Error(`Failed to create task list: ${createResponse.statusText}`);
+      await handleErrorResponse(createResponse, `Failed to create task list`);
     }
     
     const newList = await createResponse.json();
@@ -139,7 +156,7 @@ export const createGoogleTask = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to create task: ${response.statusText}`);
+      await handleErrorResponse(response, `Failed to create task`);
     }
     
     return await response.json();
@@ -157,7 +174,7 @@ export const fetchGoogleTasks = async (token: string, listId: string): Promise<a
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch tasks: ${response.statusText}`);
+      await handleErrorResponse(response, `Failed to fetch tasks`);
     }
     
     const data = await response.json();
@@ -186,7 +203,7 @@ export const updateGoogleTask = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to update task: ${response.statusText}`);
+      await handleErrorResponse(response, `Failed to update task`);
     }
     
     return await response.json();
@@ -205,7 +222,7 @@ export const deleteGoogleTask = async (token: string, listId: string, taskId: st
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to delete task: ${response.statusText}`);
+      await handleErrorResponse(response, `Failed to delete task`);
     }
     
     return true;

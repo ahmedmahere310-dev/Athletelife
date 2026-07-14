@@ -53,6 +53,7 @@ export default function GoogleTasksSync({
   const [showPrompt, setShowPrompt] = useState<boolean>(showOnboardingPromptInitially);
   const [showChecklist, setShowChecklist] = useState<boolean>(false);
   const [syncedTasks, setSyncedTasks] = useState<any[]>([]);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [taskListName, setTaskListName] = useState<string>('');
   
   // New custom task form state
@@ -175,12 +176,14 @@ export default function GoogleTasksSync({
   const loadSyncedTasks = async () => {
     if (!token) return;
     setIsLoading(true);
+    setSyncError(null);
     try {
       const listId = await getOrCreateTaskList(token, isArabic);
       const tasks = await fetchGoogleTasks(token, listId);
       setSyncedTasks(tasks);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching Google Tasks:', error);
+      setSyncError(error?.message || 'Error loading tasks');
     } finally {
       setIsLoading(false);
     }
@@ -259,6 +262,7 @@ export default function GoogleTasksSync({
   const handleOnboardingSync = async () => {
     if (!token) return;
     setIsSyncing(true);
+    setSyncError(null);
     try {
       const listId = await getOrCreateTaskList(token, isArabic);
       
@@ -317,9 +321,31 @@ export default function GoogleTasksSync({
       await loadSyncedTasks();
       alert(currentT.syncSuccess);
       if (onClose) onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error during batch sync:', error);
-      alert('Error syncing tasks. Please try again.');
+      const msg = error?.message || '';
+      setSyncError(msg);
+      
+      let friendlyError = '';
+      if (isArabic) {
+        if (msg.includes('scopes') || msg.includes('Permission') || msg.includes('permission')) {
+          friendlyError = '❌ خطأ في الصلاحيات:\n\nيرجى التأكد من تفعيل علامة الصح (✓) والموافقة على صلاحيات "Google Tasks" (عرض وإدارة مهامك) أثناء تسجيل الدخول بحساب جوجل الخاص بك.\n\nإذا لم تظهر لك الخيارات، يرجى الضغط على زر تسجيل الخروج (Disconnect) ثم إعادة تسجيل الدخول والموافقة على جميع الصلاحيات.';
+        } else if (msg.includes('disabled') || msg.includes('not been used') || msg.includes('Tasks API')) {
+          friendlyError = '❌ خدمة Google Tasks غير مفعلة:\n\nيرجى تفعيل "Google Tasks API" في لوحة تحكم Google Cloud Console لمشروعك (athletelifeos).\n\nيمكنك تفعيلها بسهولة عبر هذا الرابط:\nhttps://console.developers.google.com/apis/api/tasks.googleapis.com/overview';
+        } else {
+          friendlyError = `حدث خطأ أثناء المزامنة: ${msg || 'يرجى المحاولة مرة أخرى.'}`;
+        }
+      } else {
+        if (msg.includes('scopes') || msg.includes('Permission') || msg.includes('permission')) {
+          friendlyError = '❌ Permission Error:\n\nPlease make sure to check/tick the boxes for "Google Tasks" permissions when signing in with Google.\n\nIf you did not see the checkboxes, disconnect and sign in again, making sure to grant access to manage your tasks.';
+        } else if (msg.includes('disabled') || msg.includes('not been used') || msg.includes('Tasks API')) {
+          friendlyError = '❌ Google Tasks API Disabled:\n\nPlease make sure Google Tasks API is enabled in your Google Cloud Console for project (athletelifeos).\n\nYou can enable it here:\nhttps://console.developers.google.com/apis/api/tasks.googleapis.com/overview';
+        } else {
+          friendlyError = `Error syncing tasks: ${msg || 'Please try again.'}`;
+        }
+      }
+      
+      alert(friendlyError);
     } finally {
       setIsSyncing(false);
     }
@@ -603,7 +629,48 @@ export default function GoogleTasksSync({
       </div>
 
       {user ? (
-        <div className="grid md:grid-cols-12 gap-6">
+        <div className="space-y-6">
+          {syncError && (
+            <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 space-y-2">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} />
+                <div className="space-y-1">
+                  <h5 className="text-xs font-bold text-red-400">
+                    {isArabic ? "تنبيه بخصوص الربط مع جوجل" : "Google Tasks Integration Alert"}
+                  </h5>
+                  <p className="text-xs text-zinc-400 leading-normal">
+                    {syncError.includes('scopes') || syncError.includes('Permission') || syncError.includes('permission') ? (
+                      isArabic ? (
+                        "يرجى التأكد من الموافقة على صلاحيات 'Google Tasks' (عرض وإدارة المهام) عند تسجيل الدخول بحساب جوجل. اضغط على زر تسجيل الخروج (Disconnect) ثم سجّل الدخول مجدداً وحدد كافة الصلاحيات المطلوبة."
+                      ) : (
+                        "Please make sure to approve 'Google Tasks' permissions when logging in with Google. Click 'Disconnect' and connect again to check all permission boxes."
+                      )
+                    ) : syncError.includes('disabled') || syncError.includes('not been used') || syncError.includes('Tasks API') ? (
+                      isArabic ? (
+                        <span>
+                          يرجى التأكد من تفعيل <strong>Google Tasks API</strong> في لوحة تحكم Google Cloud Console لمشروعك (athletelifeos). 
+                          <a href="https://console.developers.google.com/apis/api/tasks.googleapis.com/overview" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline ml-1 font-semibold inline-flex items-center gap-1">
+                            تفعيل الخدمة من هنا <ExternalLink size={12} />
+                          </a>
+                        </span>
+                      ) : (
+                        <span>
+                          Please enable the <strong>Google Tasks API</strong> in your Google Cloud Console for project (athletelifeos). 
+                          <a href="https://console.developers.google.com/apis/api/tasks.googleapis.com/overview" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline ml-1 font-semibold inline-flex items-center gap-1">
+                            Enable it here <ExternalLink size={12} />
+                          </a>
+                        </span>
+                      )
+                    ) : (
+                      isArabic ? `فشلت العملية: ${syncError}` : `Operation failed: ${syncError}`
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-12 gap-6">
           
           {/* Active Synced Tasks List (Left Column) */}
           <div className="md:col-span-7 space-y-4">
@@ -755,6 +822,7 @@ export default function GoogleTasksSync({
             </button>
           </form>
 
+        </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center max-w-sm mx-auto space-y-4">
