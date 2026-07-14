@@ -144,16 +144,20 @@ export default function GoogleTasksSync({
   // Set default checkboxes on checklist mount or when plan changes
   useEffect(() => {
     const initialSelections: Record<string, boolean> = {};
-    plan.days.forEach(day => {
-      // Workouts
-      if (!day.isRest) {
-        initialSelections[`workout-${day.dayNumber}`] = true;
-      }
-      // Meals
-      day.meals.forEach(meal => {
-        initialSelections[`meal-${day.dayNumber}-${meal.id}`] = true;
+    if (plan && plan.days) {
+      plan.days.forEach(day => {
+        // Workouts
+        if (!day.isRest) {
+          initialSelections[`workout-${day.dayNumber}`] = true;
+        }
+        // Meals
+        if (day.meals) {
+          day.meals.forEach(meal => {
+            initialSelections[`meal-${day.dayNumber}-${meal.id}`] = true;
+          });
+        }
       });
-    });
+    }
     setSelectedItems(initialSelections);
   }, [plan]);
 
@@ -253,12 +257,12 @@ export default function GoogleTasksSync({
     try {
       const listId = await getOrCreateTaskList(token, isArabic);
       
-      const updatedDays = JSON.parse(JSON.stringify(plan.days)) as WorkoutDay[];
+      const updatedDays = JSON.parse(JSON.stringify(plan?.days || [])) as WorkoutDay[];
       
       // Iterate through selected items and push to Google Tasks
       for (const day of updatedDays) {
         // 1. Workout Sync
-        if (!day.isRest && selectedItems[`workout-${day.dayNumber}`]) {
+        if (!day.isRest && selectedItems[`workout-${day.dayNumber}`] && day.exercises) {
           const workoutDate = getNextWeekdayDateString(day.dayNumber, 8); // 8:00 AM Morning reminder
           const exercisesText = day.exercises.map((ex, i) => 
             `${i + 1}. ${ex.name} (${ex.sets} sets x ${ex.reps}) - Notes: ${ex.notes}`
@@ -276,9 +280,10 @@ export default function GoogleTasksSync({
         }
 
         // 2. Meals Sync
-        for (const meal of day.meals) {
-          if (selectedItems[`meal-${day.dayNumber}-${meal.id}`]) {
-            const mealDate = getNextWeekdayDateString(day.dayNumber, 9 + day.meals.indexOf(meal) * 3); // Spacing meals out chronologically
+        const mealsList = day.meals || [];
+        for (const meal of mealsList) {
+          if (selectedItems[`meal-${day.dayNumber}-${meal.id}`] && meal.ingredients) {
+            const mealDate = getNextWeekdayDateString(day.dayNumber, 9 + mealsList.indexOf(meal) * 3); // Spacing meals out chronologically
             const ingredientsText = meal.ingredients.map(ing => 
               `- ${isArabic ? ing.arabicName : ing.name}: ${isArabic ? ing.arabicAmount : ing.amount}`
             ).join('\n');
@@ -454,7 +459,7 @@ export default function GoogleTasksSync({
             <div>
               <h4 className="text-sm font-semibold text-zinc-400 mb-3 sticky top-0 bg-zinc-950 py-1">{currentT.workoutsSection}</h4>
               <div className="grid sm:grid-cols-2 gap-3">
-                {plan.days.filter(d => !d.isRest).map(day => (
+                {(plan?.days || []).filter(d => !d.isRest).map(day => (
                   <button
                     key={`workout-${day.dayNumber}`}
                     onClick={() => toggleSelectItem(`workout-${day.dayNumber}`)}
@@ -482,11 +487,11 @@ export default function GoogleTasksSync({
             <div>
               <h4 className="text-sm font-semibold text-zinc-400 mb-3 sticky top-0 bg-zinc-950 py-1">{currentT.mealsSection}</h4>
               <div className="space-y-4">
-                {plan.days.map(day => (
+                {(plan?.days || []).map(day => (
                   <div key={`day-meals-${day.dayNumber}`} className="border-l-2 border-zinc-800 pl-3 py-1">
                     <p className="text-xs font-mono text-zinc-500 mb-2 uppercase">{day.dayName}</p>
                     <div className="grid sm:grid-cols-3 gap-2">
-                      {day.meals.map(meal => {
+                      {(day.meals || []).map(meal => {
                         const key = `meal-${day.dayNumber}-${meal.id}`;
                         return (
                           <button
