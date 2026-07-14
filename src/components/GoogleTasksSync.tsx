@@ -89,7 +89,9 @@ export default function GoogleTasksSync({
       saveTask: "Create Task",
       deleteConfirm: "Are you sure you want to delete this task from Google Tasks?",
       noTasksYet: "No tasks found in your AthleteLifeOS task list.",
-      syncWarning: "Note: Completing or editing tasks here will sync instantly to your Google Calendar and Google Tasks app!"
+      syncWarning: "Note: Completing or editing tasks here will sync instantly to your Google Calendar and Google Tasks app!",
+      syncPlanButton: "Import / Sync Current Plan",
+      syncPlanButtonDesc: "Choose specific days, workouts, or meals to add/update in your Google Tasks checklist."
     },
     ar: {
       syncTitle: "التكامل مع مهام جوجل (Google Tasks)",
@@ -118,7 +120,9 @@ export default function GoogleTasksSync({
       saveTask: "إنشاء المهمة",
       deleteConfirm: "هل أنت متأكد من رغبتك في حذف هذه المهمة من حساب جوجل الخاص بك؟",
       noTasksYet: "لم يتم العثور على أي مهام في قائمة AthleteLifeOS الخاصة بك.",
-      syncWarning: "تنبيه: إكمال أو تعديل المهام هنا سيتم تحديثه فوراً في تقويم جوجل وتطبيق مهام جوجل الخاص بك!"
+      syncWarning: "تنبيه: إكمال أو تعديل المهام هنا سيتم تحديثه فوراً في تقويم جوجل وتطبيق مهام جوجل الخاص بك!",
+      syncPlanButton: "مزامنة جدول التمارين والتغذية الحالي",
+      syncPlanButtonDesc: "اختر أيام تمرين معينة أو وجبات غذائية لتصديرها ومزامنتها مع مهام جوجل."
     }
   };
 
@@ -191,8 +195,9 @@ export default function GoogleTasksSync({
         setToken(result.accessToken);
         if (showPrompt) {
           setShowPrompt(false);
-          setShowChecklist(true);
         }
+        // Always open the checklist on connect so the user can import/sync their plan right away
+        setShowChecklist(true);
       }
     } catch (err) {
       console.error('Failed Google Sign-in:', err);
@@ -602,6 +607,28 @@ export default function GoogleTasksSync({
           
           {/* Active Synced Tasks List (Left Column) */}
           <div className="md:col-span-7 space-y-4">
+            {plan?.days && plan.days.length > 0 && (
+              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h5 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <Sparkles size={12} />
+                    <span>{currentT.syncPlanButton}</span>
+                  </h5>
+                  <p className="text-[11px] text-zinc-400 leading-normal">
+                    {currentT.syncPlanButtonDesc}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowChecklist(true)}
+                  className="shrink-0 px-4 py-2 rounded-xl bg-emerald-500 text-zinc-950 font-bold text-xs hover:opacity-90 active:scale-95 transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/5"
+                >
+                  <Plus size={12} />
+                  <span>{isArabic ? "ابدأ المزامنة" : "Start Sync"}</span>
+                </button>
+              </div>
+            )}
+
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-semibold text-zinc-300 flex items-center gap-1.5">
                 <span>{currentT.syncedTasksTitle}</span>
