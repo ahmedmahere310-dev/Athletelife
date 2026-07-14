@@ -49,7 +49,11 @@ export function generateDailyMeals(profile: UserProfile, macros: Macros, dayNumb
     const wholeEggsCount = Math.max(1, Math.min(3, Math.floor(f / 5.5)));
     const wholeEggsProtein = wholeEggsCount * 6;
     const remainingProteinNeeded = Math.max(0, p - wholeEggsProtein);
-    const eggWhitesCount = Math.max(0, Math.ceil(remainingProteinNeeded / 4));
+    
+    // Cap egg whites at 3 to prevent waste and keep the meal realistic.
+    const eggWhitesCount = Math.max(0, Math.min(3, Math.ceil(remainingProteinNeeded / 4)));
+    const eggProtein = wholeEggsProtein + (eggWhitesCount * 4);
+    const extraProteinNeeded = Math.max(0, p - eggProtein);
 
     // Name formatting based on egg whites count
     const eggNameEn = eggWhitesCount > 0 
@@ -61,7 +65,7 @@ export function generateDailyMeals(profile: UserProfile, macros: Macros, dayNumb
 
     const oatsGrams = Math.max(30, Math.round(c * 1.5));
 
-    return [
+    const ingredientsList: MealIngredient[] = [
       {
         name: eggNameEn,
         arabicName: eggNameAr,
@@ -94,6 +98,23 @@ export function generateDailyMeals(profile: UserProfile, macros: Macros, dayNumb
         ]
       }
     ];
+
+    if (extraProteinNeeded >= 5) {
+      // Add Cottage Cheese as an economical, practical protein supplement to breakfast to meet requirements cleanly!
+      const cheeseGrams = Math.round(extraProteinNeeded * 8);
+      ingredientsList.push({
+        name: "Cottage Cheese (Protein Supplement)",
+        arabicName: "جبنة قريش (مكمل بروتيني طبيعي للفطور)",
+        amount: `${cheeseGrams}g`,
+        arabicAmount: `${cheeseGrams} جرام`,
+        swapOptions: [
+          { name: "Fava Beans (Cheap Protein)", arabicName: "فول مدمس اقتصادي", amount: `${Math.round(extraProteinNeeded * 5)}g`, arabicAmount: `${Math.round(extraProteinNeeded * 5)} جرام` },
+          { name: "Low-fat Greek Yogurt", arabicName: "زبادي يوناني قليل الدسم", amount: `${Math.round(extraProteinNeeded * 7)}g`, arabicAmount: `${Math.round(extraProteinNeeded * 7)} جرام` }
+        ]
+      });
+    }
+
+    return ingredientsList;
   };
 
   const getBreakfastSwaps = (p: number, c: number, f: number) => {
@@ -221,7 +242,12 @@ export function generateDailyMeals(profile: UserProfile, macros: Macros, dayNumb
         arabicAmount: "1.1 مكيال (30 جرام بروتين)",
         swapOptions: [
           { name: "Low-fat Cottage Cheese (Highly Economical)", arabicName: "جبنة قريش ريفية اقتصادية", amount: `${Math.round(p * 8)}g`, arabicAmount: `${Math.round(p * 8)} جرام` },
-          { name: "Boiled Eggs (Budget staple)", arabicName: "بيض مسلوق كامل (بروتين اقتصادي)", amount: `${Math.max(2, Math.round(p / 6))} pieces`, arabicAmount: `${Math.max(2, Math.round(p / 6))} بيضات` },
+          { 
+            name: "Boiled Eggs (Max 3 Whole + whites)", 
+            arabicName: "بيض مسلوق (بحد أقصى 3 كاملة + الباقي بياض)", 
+            amount: p > 18 ? `3 Whole + ${Math.max(0, Math.ceil((p - 18) / 4))} Whites` : `${Math.max(1, Math.round(p / 6))} Whole Eggs`, 
+            arabicAmount: p > 18 ? `3 كاملة + ${Math.max(0, Math.ceil((p - 18) / 4))} بياض بيض` : `${Math.max(1, Math.round(p / 6))} بيضات كاملة` 
+          },
           { name: "Fat-free Greek Yogurt", arabicName: "زبادي يوناني طبيعي بدون دسم", amount: "180g", arabicAmount: "180 جرام" }
         ]
       },
@@ -494,21 +520,26 @@ export function generateWorkoutPlan(profile: UserProfile): WorkoutDay[] {
   // Determine active days indexes out of 7 (0-6)
   // We want to distribute training days as evenly as possible.
   let activeDaysMask: boolean[] = [];
-  switch (daysPerWeek) {
-    case 3:
-      activeDaysMask = [true, false, true, false, true, false, false]; // Mon, Wed, Fri
-      break;
-    case 4:
-      activeDaysMask = [true, true, false, true, true, false, false]; // Mon, Tue, Thu, Fri
-      break;
-    case 5:
-      activeDaysMask = [true, true, true, false, true, true, false]; // Mon, Tue, Wed, Fri, Sat
-      break;
-    case 6:
-      activeDaysMask = [true, true, true, true, true, true, false]; // Mon-Sat
-      break;
-    default:
-      activeDaysMask = [true, true, false, true, true, false, false];
+  if (trainingSystem === 'ppl') {
+    // Push/Pull/Legs (PPL) is scientifically designed to run with exactly 3 rest days per week
+    activeDaysMask = [true, true, false, true, true, false, false]; // Mon, Tue, Thu, Fri are active (4 active, 3 rest)
+  } else {
+    switch (daysPerWeek) {
+      case 3:
+        activeDaysMask = [true, false, true, false, true, false, false]; // Mon, Wed, Fri
+        break;
+      case 4:
+        activeDaysMask = [true, true, false, true, true, false, false]; // Mon, Tue, Thu, Fri
+        break;
+      case 5:
+        activeDaysMask = [true, true, true, false, true, true, false]; // Mon, Tue, Wed, Fri, Sat
+        break;
+      case 6:
+        activeDaysMask = [true, true, true, true, true, true, false]; // Mon-Sat
+        break;
+      default:
+        activeDaysMask = [true, true, false, true, true, false, false];
+    }
   }
 
   const days: WorkoutDay[] = [];

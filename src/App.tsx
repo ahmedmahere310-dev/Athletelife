@@ -109,7 +109,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-zinc-950" dir={isArabic ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-[#000000] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-zinc-950 w-full overflow-x-hidden relative" dir={isArabic ? 'rtl' : 'ltr'}>
       {/* Absolute ambient lights */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
