@@ -3,6 +3,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User,
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
+console.log('Initializing Firebase with config:', firebaseConfig);
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
@@ -40,12 +41,17 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
+    console.log('Starting Google Sign-in...');
     const result = await signInWithPopup(auth, googleProvider);
+    console.log('Sign-in result:', result);
     const credential = GoogleAuthProvider.credentialFromResult(result);
+    console.log('Credential:', credential);
     if (!credential?.accessToken) {
+      console.error('Failed to retrieve access token from Google Auth');
       throw new Error('Failed to retrieve access token from Google Auth');
     }
     cachedAccessToken = credential.accessToken;
+    console.log('Cached access token successfully');
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error) {
     console.error('Error during Google Sign-in:', error);
