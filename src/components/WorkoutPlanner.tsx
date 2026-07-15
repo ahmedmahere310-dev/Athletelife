@@ -14,8 +14,11 @@ import {
   Info,
   ChevronDown,
   CalendarDays,
-  Shuffle
+  Shuffle,
+  Grid,
+  List
 } from 'lucide-react';
+import { useNotification } from './NotificationProvider';
 
 interface WorkoutPlannerProps {
   days: WorkoutDay[];
@@ -25,6 +28,8 @@ interface WorkoutPlannerProps {
 }
 
 export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTaskListId }: WorkoutPlannerProps) {
+  const { alert, confirm } = useNotification();
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [activeDayIndex, setActiveDayIndex] = useState<number>(0);
   const [completedExercises, setCompletedExercises] = useState<Record<string, boolean>>({});
   const [activeSwapExerciseId, setActiveSwapExerciseId] = useState<string | null>(null);
@@ -66,10 +71,16 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
     const token = getAccessToken();
     if (token && googleTaskListId) {
       const activeUpdatedDay = updatedDays[activeDayIndex];
-      const shouldSync = window.confirm(
+      const shouldSync = await confirm(
         isArabic 
           ? "لقد قمت بتعديل جدول التمارين. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
-          : "You modified the workout routine. Would you like to update and sync this new change to Google Tasks?"
+          : "You modified the workout routine. Would you like to update and sync this new change to Google Tasks?",
+        {
+          title: isArabic ? "مزامنة التعديلات مع جوجل؟" : "Sync Changes with Google?",
+          confirmText: isArabic ? "نعم، مزامنة" : "Yes, Sync",
+          cancelText: isArabic ? "ليس الآن" : "Not now",
+          type: 'info'
+        }
       );
       if (shouldSync) {
         try {
@@ -83,11 +94,23 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
               return d;
             });
             onUpdateDays(finalDays);
-            alert(isArabic ? "تم التحديث بنجاح في مهام جوجل!" : "Successfully updated in Google Tasks!");
+            await alert(
+              isArabic ? "تم تحديث جدول التمارين بنجاح في مهام جوجل!" : "Successfully updated workout routine in Google Tasks!",
+              {
+                title: isArabic ? "مزامنة ناجحة" : "Sync Successful",
+                type: 'success'
+              }
+            );
           }
         } catch (error) {
           console.error("Error syncing to Google Tasks:", error);
-          alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing to Google Tasks.");
+          await alert(
+            isArabic ? "حدث خطأ أثناء المزامنة. يرجى المحاولة مرة أخرى." : "An error occurred during sync. Please try again.",
+            {
+              title: isArabic ? "خطأ في المزامنة" : "Sync Error",
+              type: 'error'
+            }
+          );
         }
       }
     }
@@ -108,197 +131,375 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
 
   return (
     <div className="space-y-6" id="workout-planner-module">
-      {/* Week Day Selector - Horizontal Grid */}
-      <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
-        {days.map((day, idx) => {
-          const isActive = idx === activeDayIndex;
-          const isRest = day.isRest;
-          const allDone = !isRest && day.exercises.length > 0 && day.exercises.every(ex => completedExercises[ex.id]);
-
-          return (
-            <button
-              key={day.dayNumber}
-              onClick={() => {
-                setActiveDayIndex(idx);
-                setActiveSwapExerciseId(null);
-              }}
-              className={`flex flex-col items-center p-3 rounded-2xl border text-center transition-all duration-300 relative overflow-hidden ${
-                isActive
-                  ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-md glow-emerald'
-                  : 'bg-zinc-950/40 border-zinc-900 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200'
-              }`}
-            >
-              <span className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-50">
-                {isArabic ? `اليوم ${day.dayNumber}` : `DAY 0${day.dayNumber}`}
-              </span>
-              <span className="text-sm font-display font-semibold mt-1">
-                {dayLabel(day.dayName).substring(0, isArabic ? 7 : 3)}
-              </span>
-              
-              {/* Indicators */}
-              <div className="flex gap-1 mt-2">
-                {isRest ? (
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" title="Rest Day" />
-                ) : allDone ? (
-                  <Check size={10} className="text-emerald-400" />
-                ) : (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
-                )}
-              </div>
-            </button>
-          );
-        })}
+      
+      {/* View Mode Selector: By Day vs By Week */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-zinc-950/20 p-3 rounded-2xl border border-zinc-900/60 backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="text-emerald-400" size={16} />
+          <span className="text-xs font-semibold text-zinc-300">
+            {isArabic ? "طريقة تنظيم وعرض الخطة:" : "Plan View Layout:"}
+          </span>
+        </div>
+        <div className="flex gap-1 bg-zinc-900 p-1 rounded-xl w-full sm:w-auto">
+          <button
+            onClick={() => setViewMode('day')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${
+              viewMode === 'day'
+                ? 'bg-emerald-500 text-zinc-950 shadow-md scale-[1.02]'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <List size={12} />
+            <span>{isArabic ? "عرض باليوم" : "By Day"}</span>
+          </button>
+          <button
+            onClick={() => setViewMode('week')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${
+              viewMode === 'week'
+                ? 'bg-emerald-500 text-zinc-950 shadow-md scale-[1.02]'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Grid size={12} />
+            <span>{isArabic ? "عرض بالأسبوع كامل" : "By Week (Full)"}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Focus Area for Selected Day */}
-      <div className="glass-panel rounded-3xl p-6 relative overflow-hidden">
-        {/* Decorative corner glows */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+      {viewMode === 'week' ? (
+        /* Week View Mode - Bento Grid Layout */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+          {days.map((day) => {
+            const isRest = day.isRest;
+            const allDone = !isRest && day.exercises.length > 0 && day.exercises.every(ex => completedExercises[ex.id]);
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-zinc-900 mb-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarDays size={16} className="text-emerald-400" />
-              <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider font-bold">
-                {isArabic ? `تفاصيل اليوم ${activeDay.dayNumber}` : `DAY ${activeDay.dayNumber} OVERVIEW`}
-              </span>
-            </div>
-            <h3 className="text-2xl font-display font-bold text-white">
-              {dayLabel(activeDay.dayName)} - <span className="text-zinc-400 font-normal text-lg">{activeDay.focus}</span>
-            </h3>
-          </div>
+            return (
+              <div 
+                key={day.dayNumber}
+                className={`glass-panel p-5 rounded-3xl border transition-all duration-300 relative overflow-hidden ${
+                  isRest 
+                    ? 'bg-zinc-950/20 border-zinc-900/40 opacity-75' 
+                    : allDone 
+                      ? 'border-emerald-500/30 bg-emerald-500/[0.02]' 
+                      : 'bg-zinc-950/40 border-zinc-900 hover:border-zinc-800'
+                }`}
+              >
+                {/* Decorative glow for active rest or workouts */}
+                <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full blur-2xl pointer-events-none ${
+                  isRest ? 'bg-zinc-800/10' : 'bg-emerald-500/5'
+                }`} />
 
-          <div className="flex gap-2">
-            {activeDay.isRest ? (
-              <span className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-bold rounded-full">
-                {isArabic ? "استشفاء نشط" : "Recovery Mode"}
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full flex items-center gap-1">
-                <Dumbbell size={12} />
-                {activeDay.exercises.length} {isArabic ? "تمارين" : "Exercises"}
-              </span>
-            )}
-          </div>
-        </div>
+                {/* Day Header */}
+                <div className="flex justify-between items-start gap-2 pb-3 border-b border-zinc-900/60 mb-3 relative z-10">
+                  <div>
+                    <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-wider block">
+                      {isArabic ? `اليوم ${day.dayNumber}` : `DAY 0${day.dayNumber}`}
+                    </span>
+                    <h4 className="text-sm font-display font-bold text-white leading-tight">
+                      {dayLabel(day.dayName)}
+                    </h4>
+                    <span className="text-xs text-zinc-400 mt-0.5 block truncate max-w-[180px]" title={day.focus}>
+                      {day.focus}
+                    </span>
+                  </div>
 
-        {/* Exercises List */}
-        {activeDay.isRest ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-            <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-900 text-zinc-500">
-              <Award size={40} className="stroke-[1.5]" />
-            </div>
-            <div className="max-w-md">
-              <h4 className="text-lg font-semibold text-white mb-2">
-                {isArabic ? "يوم استشفاء ونمو عضلي" : "Muscle Recovery & Growth Day"}
-              </h4>
-              <p className="text-sm text-zinc-400 leading-relaxed">
-                {isArabic
-                  ? "العضلات لا تنمو أثناء التمرين بل تنمو أثناء الراحة! ركز اليوم على التغذية السليمة، شرب المياه، والنوم لمدة 7-8 ساعات، مع المشي الخفيف أو الإطالات."
-                  : "Muscles are torn in the gym, fed in the kitchen, and built in bed. Prioritize high-quality protein, hydration, stretching, and 7-9 hours of sound sleep."}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {activeDay.exercises.map((exercise) => {
-              const isCompleted = completedExercises[exercise.id];
-              const isSwapping = activeSwapExerciseId === exercise.id;
-
-              return (
-                <div 
-                  key={exercise.id}
-                  className={`p-4 rounded-2xl border transition-all duration-300 relative ${
-                    isCompleted 
-                      ? 'bg-zinc-950/30 border-emerald-500/20 opacity-60' 
-                      : 'bg-zinc-950/60 border-zinc-900 hover:border-zinc-800'
-                  }`}
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    {/* Left: Checkbox + Name */}
-                    <div className="flex items-start gap-4">
-                      <button
-                        onClick={() => toggleComplete(exercise.id)}
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 mt-1 transition-all ${
-                          isCompleted
-                            ? 'bg-emerald-500 border-emerald-400 text-zinc-950'
-                            : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-transparent'
-                        }`}
-                      >
-                        <Check size={14} className="stroke-[3]" />
-                      </button>
-
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className={`text-base font-semibold ${isCompleted ? 'line-through text-zinc-500' : 'text-white'}`}>
-                            {exercise.name}
-                          </h4>
-                          <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-500 font-mono rounded">
-                            {exercise.category}
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400 mt-1 flex items-start gap-1 leading-relaxed">
-                          <Info size={12} className="text-zinc-500 shrink-0 mt-0.5" />
-                          <span>{exercise.notes}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Right: Sets & Reps + Swap Button */}
-                    <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-none pt-3 md:pt-0 border-zinc-900">
-                      <div className="flex gap-4 text-xs font-mono">
-                        <div className="text-zinc-500">
-                          {isArabic ? "المجموعات:" : "SETS:"} <span className="text-emerald-400 font-bold text-sm ml-1">{exercise.sets}</span>
-                        </div>
-                        <div className="text-zinc-500">
-                          {isArabic ? "التكرارات:" : "REPS:"} <span className="text-emerald-400 font-bold text-sm ml-1">{exercise.reps}</span>
-                        </div>
-                      </div>
-
-                      {/* Swap trigger */}
-                      {exercise.swapOptions && exercise.swapOptions.length > 0 && (
-                        <div className="relative">
-                          <button
-                            onClick={() => {
-                              setActiveSwapExerciseId(isSwapping ? null : exercise.id);
-                            }}
-                            className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 transition flex items-center gap-1.5 text-xs"
-                            title={isArabic ? "استبدال التمرين يدوياً" : "Swap exercise"}
-                          >
-                            <Shuffle size={14} className="text-emerald-500" />
-                            <span className="hidden sm:inline">{isArabic ? "استبدال" : "Swap"}</span>
-                          </button>
-
-                          {/* Swap dropdown overlay */}
-                          {isSwapping && (
-                            <div className={`absolute right-0 z-20 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl p-2 font-sans ${
-                              isArabic ? 'left-0 right-auto' : 'right-0'
-                            }`}>
-                              <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-zinc-900 mb-1">
-                                {isArabic ? "اختر تمرينًا بديلًا مناسبًا:" : "Select alternative exercise:"}
-                              </div>
-                              {exercise.swapOptions.map((option) => (
-                                <button
-                                  key={option}
-                                  onClick={() => handleSwapExercise(exercise.id, option)}
-                                  className="w-full text-left px-3 py-2 rounded-xl text-xs text-zinc-300 hover:bg-emerald-500 hover:text-zinc-950 transition-all font-medium flex items-center justify-between"
-                                >
-                                  <span>{option}</span>
-                                  <RefreshCw size={10} className="opacity-50" />
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                  <div>
+                    {isRest ? (
+                      <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-500 text-[10px] font-bold rounded-full">
+                        {isArabic ? "استشفاء" : "Rest"}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full">
+                        {day.exercises.length} {isArabic ? "تمارين" : "Ex"}
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                {/* Exercises Stack */}
+                {isRest ? (
+                  <div className="py-10 text-center text-zinc-500 flex flex-col items-center justify-center space-y-2 relative z-10">
+                    <div className="p-2.5 bg-zinc-900/40 rounded-xl border border-zinc-850">
+                      <Award size={20} className="stroke-[1.5] text-zinc-600" />
+                    </div>
+                    <p className="text-xs font-semibold text-zinc-400">
+                      {isArabic ? "استشفاء ونمو عضلي" : "Active Recovery Day"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 relative z-10">
+                    {day.exercises.map((exercise) => {
+                      const isCompleted = completedExercises[exercise.id];
+                      const isSwapping = activeSwapExerciseId === exercise.id;
+
+                      return (
+                        <div 
+                          key={exercise.id}
+                          className={`p-3 rounded-xl border text-xs transition-all relative ${
+                            isCompleted 
+                              ? 'bg-zinc-950/20 border-emerald-500/10 opacity-50' 
+                              : 'bg-zinc-900/40 border-zinc-850 hover:border-zinc-800'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <button
+                                onClick={() => toggleComplete(exercise.id)}
+                                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                                  isCompleted
+                                    ? 'bg-emerald-500 border-emerald-400 text-zinc-950'
+                                    : 'bg-zinc-950 border-zinc-850 hover:border-zinc-700 text-transparent'
+                                }`}
+                              >
+                                <Check size={10} className="stroke-[4]" />
+                              </button>
+                              <div className="min-w-0">
+                                <span className={`font-bold block truncate ${isCompleted ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+                                  {exercise.name}
+                                </span>
+                                <span className="text-[9px] text-zinc-500 font-mono block mt-0.5">
+                                  {isArabic ? "مجموعات:" : "Sets:"} {exercise.sets} × {exercise.reps}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Swap option */}
+                            {exercise.swapOptions && exercise.swapOptions.length > 0 && (
+                              <div className="relative shrink-0">
+                                <button
+                                  onClick={() => {
+                                    setActiveSwapExerciseId(isSwapping ? null : exercise.id);
+                                  }}
+                                  className="p-1 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-500 hover:text-white transition"
+                                  title={isArabic ? "استبدال" : "Swap"}
+                                >
+                                  <Shuffle size={10} />
+                                </button>
+
+                                {isSwapping && (
+                                  <div className={`absolute right-0 z-30 mt-1 w-48 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl p-1 font-sans ${
+                                    isArabic ? 'left-0 right-auto' : 'right-0'
+                                  }`}>
+                                    {exercise.swapOptions.map((option) => (
+                                      <button
+                                        key={option}
+                                        onClick={() => handleSwapExercise(exercise.id, option)}
+                                        className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] text-zinc-300 hover:bg-emerald-500 hover:text-zinc-950 transition font-medium flex items-center justify-between"
+                                      >
+                                        <span className="truncate">{option}</span>
+                                        <RefreshCw size={8} />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Day View Mode - Standard Day Tab navigation */
+        <>
+          {/* Week Day Selector - Horizontal Grid */}
+          <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
+            {days.map((day, idx) => {
+              const isActive = idx === activeDayIndex;
+              const isRest = day.isRest;
+              const allDone = !isRest && day.exercises.length > 0 && day.exercises.every(ex => completedExercises[ex.id]);
+
+              return (
+                <button
+                  key={day.dayNumber}
+                  onClick={() => {
+                    setActiveDayIndex(idx);
+                    setActiveSwapExerciseId(null);
+                  }}
+                  className={`flex flex-col items-center p-3 rounded-2xl border text-center transition-all duration-300 relative overflow-hidden ${
+                    isActive
+                      ? 'bg-emerald-500/10 border-emerald-500 text-white shadow-md glow-emerald'
+                      : 'bg-zinc-950/40 border-zinc-900 text-zinc-400 hover:border-zinc-800 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-[10px] font-mono font-bold tracking-wider uppercase opacity-50">
+                    {isArabic ? `اليوم ${day.dayNumber}` : `DAY 0${day.dayNumber}`}
+                  </span>
+                  <span className="text-sm font-display font-semibold mt-1">
+                    {dayLabel(day.dayName).substring(0, isArabic ? 7 : 3)}
+                  </span>
+                  
+                  {/* Indicators */}
+                  <div className="flex gap-1 mt-2">
+                    {isRest ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" title="Rest Day" />
+                    ) : allDone ? (
+                      <Check size={10} className="text-emerald-400" />
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+                    )}
+                  </div>
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
+
+          {/* Main Focus Area for Selected Day */}
+          <div className="glass-panel rounded-3xl p-6 relative overflow-hidden">
+            {/* Decorative corner glows */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-zinc-900 mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <CalendarDays size={16} className="text-emerald-400" />
+                  <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider font-bold">
+                    {isArabic ? `تفاصيل اليوم ${activeDay.dayNumber}` : `DAY ${activeDay.dayNumber} OVERVIEW`}
+                  </span>
+                </div>
+                <h3 className="text-2xl font-display font-bold text-white">
+                  {dayLabel(activeDay.dayName)} - <span className="text-zinc-400 font-normal text-lg">{activeDay.focus}</span>
+                </h3>
+              </div>
+
+              <div className="flex gap-2">
+                {activeDay.isRest ? (
+                  <span className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-bold rounded-full">
+                    {isArabic ? "استشفاء نشط" : "Recovery Mode"}
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full flex items-center gap-1">
+                    <Dumbbell size={12} />
+                    {activeDay.exercises.length} {isArabic ? "تمارين" : "Exercises"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Exercises List */}
+            {activeDay.isRest ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-900 text-zinc-500">
+                  <Award size={40} className="stroke-[1.5]" />
+                </div>
+                <div className="max-w-md">
+                  <h4 className="text-lg font-semibold text-white mb-2">
+                    {isArabic ? "يوم استشفاء ونمو عضلي" : "Muscle Recovery & Growth Day"}
+                  </h4>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    {isArabic
+                      ? "العضلات لا تنمو أثناء التمرين بل تنمو أثناء الراحة! ركز اليوم على التغذية السليمة، شرب المياه، والنوم لمدة 7-8 ساعات، مع المشي الخفيف أو الإطالات."
+                      : "Muscles are torn in the gym, fed in the kitchen, and built in bed. Prioritize high-quality protein, hydration, stretching, and 7-9 hours of sound sleep."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activeDay.exercises.map((exercise) => {
+                  const isCompleted = completedExercises[exercise.id];
+                  const isSwapping = activeSwapExerciseId === exercise.id;
+
+                  return (
+                    <div 
+                      key={exercise.id}
+                      className={`p-4 rounded-2xl border transition-all duration-300 relative ${
+                        isCompleted 
+                          ? 'bg-zinc-950/30 border-emerald-500/20 opacity-60' 
+                          : 'bg-zinc-950/60 border-zinc-900 hover:border-zinc-800'
+                      }`}
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        {/* Left: Checkbox + Name */}
+                        <div className="flex items-start gap-4">
+                          <button
+                            onClick={() => toggleComplete(exercise.id)}
+                            className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 mt-1 transition-all ${
+                              isCompleted
+                                ? 'bg-emerald-500 border-emerald-400 text-zinc-950'
+                                : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700 text-transparent'
+                            }`}
+                          >
+                            <Check size={14} className="stroke-[3]" />
+                          </button>
+
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className={`text-base font-semibold ${isCompleted ? 'line-through text-zinc-500' : 'text-white'}`}>
+                                {exercise.name}
+                              </h4>
+                              <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-500 font-mono rounded">
+                                {exercise.category}
+                              </span>
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-1 flex items-start gap-1 leading-relaxed">
+                              <Info size={12} className="text-zinc-500 shrink-0 mt-0.5" />
+                              <span>{exercise.notes}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: Sets & Reps + Swap Button */}
+                        <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-none pt-3 md:pt-0 border-zinc-900">
+                          <div className="flex gap-4 text-xs font-mono">
+                            <div className="text-zinc-500">
+                              {isArabic ? "المجموعات:" : "SETS:"} <span className="text-emerald-400 font-bold text-sm ml-1">{exercise.sets}</span>
+                            </div>
+                            <div className="text-zinc-500">
+                              {isArabic ? "التكرارات:" : "REPS:"} <span className="text-emerald-400 font-bold text-sm ml-1">{exercise.reps}</span>
+                            </div>
+                          </div>
+
+                          {/* Swap trigger */}
+                          {exercise.swapOptions && exercise.swapOptions.length > 0 && (
+                            <div className="relative">
+                              <button
+                                onClick={() => {
+                                  setActiveSwapExerciseId(isSwapping ? null : exercise.id);
+                                }}
+                                className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 transition flex items-center gap-1.5 text-xs"
+                                title={isArabic ? "استبدال التمرين يدوياً" : "Swap exercise"}
+                              >
+                                <Shuffle size={14} className="text-emerald-500" />
+                                <span className="hidden sm:inline">{isArabic ? "استبدال" : "Swap"}</span>
+                              </button>
+
+                              {/* Swap dropdown overlay */}
+                              {isSwapping && (
+                                <div className={`absolute right-0 z-20 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl p-2 font-sans ${
+                                  isArabic ? 'left-0 right-auto' : 'right-0'
+                                }`}>
+                                  <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-zinc-900 mb-1">
+                                    {isArabic ? "اختر تمرينًا بديلًا مناسبًا:" : "Select alternative exercise:"}
+                                  </div>
+                                  {exercise.swapOptions.map((option) => (
+                                    <button
+                                      key={option}
+                                      onClick={() => handleSwapExercise(exercise.id, option)}
+                                      className="w-full text-left px-3 py-2 rounded-xl text-xs text-zinc-300 hover:bg-emerald-500 hover:text-zinc-950 transition-all font-medium flex items-center justify-between"
+                                    >
+                                      <span>{option}</span>
+                                      <RefreshCw size={10} className="opacity-50" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

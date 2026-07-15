@@ -24,8 +24,10 @@ import {
   CheckSquare, 
   Square,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Pencil
 } from 'lucide-react';
+import { useNotification } from './NotificationProvider';
 
 interface GoogleTasksSyncProps {
   plan: GeneratedPlan;
@@ -42,6 +44,7 @@ export default function GoogleTasksSync({
   onClose,
   showOnboardingPromptInitially = false 
 }: GoogleTasksSyncProps) {
+  const { alert, confirm } = useNotification();
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -60,6 +63,14 @@ export default function GoogleTasksSync({
   const [newTitle, setNewTitle] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
+
+  // Editing task state
+  const [editingTask, setEditingTask] = useState<{
+    id: string;
+    title: string;
+    notes: string;
+    due: string;
+  } | null>(null);
 
   // Translations
   const t = {
@@ -89,6 +100,12 @@ export default function GoogleTasksSync({
       dueDate: "Due Date",
       saveTask: "Create Task",
       deleteConfirm: "Are you sure you want to delete this task from Google Tasks?",
+      deleteAll: "Delete All Tasks",
+      deleteAllConfirm: "Are you sure you want to delete ALL synced tasks from this list? This action cannot be undone.",
+      deleteAllSuccess: "All synced tasks successfully deleted!",
+      editTask: "Edit Task",
+      saveChanges: "Save Changes",
+      cancel: "Cancel",
       noTasksYet: "No tasks found in your AthleteLifeOS task list.",
       syncWarning: "Note: Completing or editing tasks here will sync instantly to your Google Calendar and Google Tasks app!",
       syncPlanButton: "Import / Sync Current Plan",
@@ -120,6 +137,12 @@ export default function GoogleTasksSync({
       dueDate: "تاريخ الاستحقاق",
       saveTask: "إنشاء المهمة",
       deleteConfirm: "هل أنت متأكد من رغبتك في حذف هذه المهمة من حساب جوجل الخاص بك؟",
+      deleteAll: "حذف جميع المهام",
+      deleteAllConfirm: "هل أنت متأكد من رغبتك في حذف جميع المهام المتزامنة من هذه القائمة؟ لا يمكن التراجع عن هذا الإجراء.",
+      deleteAllSuccess: "تم حذف جميع المهام المتزامنة بنجاح!",
+      editTask: "تعديل المهمة",
+      saveChanges: "حفظ التغييرات",
+      cancel: "إلغاء",
       noTasksYet: "لم يتم العثور على أي مهام في قائمة AthleteLifeOS الخاصة بك.",
       syncWarning: "تنبيه: إكمال أو تعديل المهام هنا سيتم تحديثه فوراً في تقويم جوجل وتطبيق مهام جوجل الخاص بك!",
       syncPlanButton: "مزامنة جدول التمارين والتغذية الحالي",
@@ -319,7 +342,10 @@ export default function GoogleTasksSync({
 
       setShowChecklist(false);
       await loadSyncedTasks();
-      alert(currentT.syncSuccess);
+      await alert(currentT.syncSuccess, {
+        title: isArabic ? "مزامنة ناجحة" : "Sync Successful",
+        type: "success"
+      });
       if (onClose) onClose();
     } catch (error: any) {
       console.error('Error during batch sync:', error);
@@ -345,7 +371,10 @@ export default function GoogleTasksSync({
         }
       }
       
-      alert(friendlyError);
+      await alert(friendlyError, {
+        title: isArabic ? "خطأ في المزامنة" : "Sync Error",
+        type: "error"
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -400,7 +429,12 @@ export default function GoogleTasksSync({
   // Delete a task completely from Google Tasks
   const handleDeleteTask = async (taskId: string) => {
     if (!token) return;
-    const confirmed = window.confirm(currentT.deleteConfirm);
+    const confirmed = await confirm(currentT.deleteConfirm, {
+      title: isArabic ? "حذف المهمة؟" : "Delete Task?",
+      confirmText: isArabic ? "حذف" : "Delete",
+      cancelText: isArabic ? "إلغاء" : "Cancel",
+      type: "danger"
+    });
     if (!confirmed) return;
     
     try {
@@ -410,6 +444,93 @@ export default function GoogleTasksSync({
       setSyncedTasks(prev => prev.filter(t => t.id !== taskId));
     } catch (error) {
       console.error('Failed to delete task:', error);
+    }
+  };
+
+  // Delete all tasks in the list
+  const handleDeleteAllTasks = async () => {
+    if (!token || syncedTasks.length === 0) return;
+    const confirmed = await confirm(currentT.deleteAllConfirm, {
+      title: isArabic ? "حذف جميع المهام؟" : "Delete All Tasks?",
+      confirmText: isArabic ? "حذف الكل" : "Delete All",
+      cancelText: isArabic ? "إلغاء" : "Cancel",
+      type: "danger"
+    });
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    try {
+      const listId = await getOrCreateTaskList(token, isArabic);
+      await Promise.all(syncedTasks.map(task => deleteGoogleTask(token, listId, task.id)));
+      
+      setSyncedTasks([]);
+      await alert(currentT.deleteAllSuccess, {
+        title: isArabic ? "عملية ناجحة" : "Success",
+        type: "success"
+      });
+    } catch (error) {
+      console.error('Failed to delete all tasks:', error);
+      await alert(
+        isArabic ? "حدث خطأ أثناء محاولة حذف جميع المهام." : "An error occurred while deleting all tasks.",
+        {
+          title: isArabic ? "خطأ في العملية" : "Error",
+          type: "error"
+        }
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Start editing a task (pre-fill state)
+  const startEditingTask = (task: any) => {
+    let formattedDate = '';
+    if (task.due) {
+      formattedDate = new Date(task.due).toISOString().split('T')[0];
+    }
+    setEditingTask({
+      id: task.id,
+      title: task.title,
+      notes: task.notes || '',
+      due: formattedDate
+    });
+  };
+
+  // Save changes toedited task
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !editingTask || !editingTask.title.trim()) return;
+    setIsSyncing(true);
+    try {
+      const listId = await getOrCreateTaskList(token, isArabic);
+      const dueFormatted = editingTask.due ? new Date(editingTask.due).toISOString() : undefined;
+      
+      await updateGoogleTask(token, listId, editingTask.id, {
+        title: editingTask.title,
+        notes: editingTask.notes,
+        due: dueFormatted
+      });
+
+      setEditingTask(null);
+      await loadSyncedTasks();
+      await alert(
+        isArabic ? "تم تعديل المهمة بنجاح!" : "Task updated successfully!",
+        {
+          title: isArabic ? "تعديل ناجح" : "Update Successful",
+          type: "success"
+        }
+      );
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      await alert(
+        isArabic ? "حدث خطأ أثناء تعديل المهمة." : "An error occurred while updating the task.",
+        {
+          title: isArabic ? "خطأ في العملية" : "Error",
+          type: "error"
+        }
+      );
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -706,13 +827,25 @@ export default function GoogleTasksSync({
                   {syncedTasks.length}
                 </span>
               </h4>
-              <button
-                onClick={loadSyncedTasks}
-                disabled={isLoading}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-zinc-900 transition"
-              >
-                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-              </button>
+              <div className="flex items-center gap-2">
+                {syncedTasks.length > 0 && (
+                  <button
+                    onClick={handleDeleteAllTasks}
+                    disabled={isLoading}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-300 border border-red-500/10 hover:border-red-500/30 bg-red-500/5 hover:bg-red-500/10 rounded-xl transition font-medium"
+                  >
+                    <Trash2 size={12} />
+                    <span>{currentT.deleteAll}</span>
+                  </button>
+                )}
+                <button
+                  onClick={loadSyncedTasks}
+                  disabled={isLoading}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-emerald-400 hover:bg-zinc-900 transition"
+                >
+                  <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
             </div>
 
             {isLoading ? (
@@ -762,12 +895,21 @@ export default function GoogleTasksSync({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="p-1.5 text-zinc-600 hover:text-red-400 transition"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => startEditingTask(task)}
+                          className="p-1.5 text-zinc-600 hover:text-emerald-400 transition"
+                          title={currentT.editTask}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-1.5 text-zinc-600 hover:text-red-400 transition"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -849,6 +991,73 @@ export default function GoogleTasksSync({
             <User size={14} />
             <span>{currentT.connectGoogle}</span>
           </button>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex items-center gap-3 border-b border-zinc-900 pb-3">
+              <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                <Pencil size={16} />
+              </div>
+              <h3 className="text-md font-display font-bold text-white">{currentT.editTask}</h3>
+            </div>
+
+            <form onSubmit={handleUpdateTask} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase">{currentT.taskTitle}</label>
+                <input
+                  type="text"
+                  required
+                  value={editingTask.title}
+                  onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                  className="w-full text-xs bg-zinc-900 border border-zinc-850 rounded-xl px-3 py-2.5 text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase">{currentT.notes}</label>
+                <textarea
+                  value={editingTask.notes}
+                  onChange={e => setEditingTask({ ...editingTask, notes: e.target.value })}
+                  rows={4}
+                  className="w-full text-xs bg-zinc-900 border border-zinc-850 rounded-xl p-3 text-white focus:border-emerald-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase">{currentT.dueDate}</label>
+                <input
+                  type="date"
+                  value={editingTask.due}
+                  onChange={e => setEditingTask({ ...editingTask, due: e.target.value })}
+                  className="w-full text-xs bg-zinc-900 border border-zinc-850 rounded-xl px-3 py-2.5 text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTask(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white transition text-xs font-semibold"
+                >
+                  {currentT.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSyncing || !editingTask.title.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-zinc-950 font-bold text-xs hover:opacity-90 active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-lg shadow-emerald-500/10"
+                >
+                  {isSyncing ? <Loader2 className="animate-spin" size={12} /> : <Check size={12} />}
+                  <span>{currentT.saveChanges}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

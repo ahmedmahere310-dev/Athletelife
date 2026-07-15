@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
+import { useNotification } from './NotificationProvider';
 
 interface NutritionDashboardProps {
   days: WorkoutDay[];
@@ -35,6 +36,7 @@ interface NutritionDashboardProps {
 }
 
 export default function NutritionDashboard({ days, onUpdateDays, macros, profile, isArabic, googleTaskListId }: NutritionDashboardProps) {
+  const { alert, confirm } = useNotification();
   const [activeDayIndex, setActiveDayIndex] = useState<number>(0);
   const [consumedWater, setConsumedWater] = useState<number>(0);
   const [activeSwapMealId, setActiveSwapMealId] = useState<string | null>(null);
@@ -113,10 +115,16 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
       const updatedMeal = activeUpdatedDay.meals.find(m => m.id === mealId);
       const mealIndex = activeUpdatedDay.meals.findIndex(m => m.id === mealId);
       if (updatedMeal) {
-        const shouldSync = window.confirm(
+        const shouldSync = await confirm(
           isArabic 
             ? "لقد قمت بتعديل الوجبة الغذائية. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
-            : "You modified the meal. Would you like to update and sync this new change to Google Tasks?"
+            : "You modified the meal. Would you like to update and sync this new change to Google Tasks?",
+          {
+            title: isArabic ? "مزامنة التعديلات مع جوجل؟" : "Sync Changes with Google?",
+            confirmText: isArabic ? "نعم، مزامنة" : "Yes, Sync",
+            cancelText: isArabic ? "ليس الآن" : "Not now",
+            type: 'info'
+          }
         );
         if (shouldSync) {
           try {
@@ -130,11 +138,23 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
                 };
               });
               onUpdateDays(finalDays);
-              alert(isArabic ? "تم تحديث الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal in Google Tasks!");
+              await alert(
+                isArabic ? "تم تحديث الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal in Google Tasks!",
+                {
+                  title: isArabic ? "مزامنة ناجحة" : "Sync Successful",
+                  type: 'success'
+                }
+              );
             }
           } catch (error) {
             console.error("Error syncing meal to Google Tasks:", error);
-            alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing meal to Google Tasks.");
+            await alert(
+              isArabic ? "حدث خطأ أثناء المزامنة. يرجى المحاولة مرة أخرى." : "An error occurred during sync. Please try again.",
+              {
+                title: isArabic ? "خطأ في المزامنة" : "Sync Error",
+                type: 'error'
+              }
+            );
           }
         }
       }
@@ -187,10 +207,16 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
       const updatedMeal = activeUpdatedDay.meals.find(m => m.id === mealId);
       const mealIndex = activeUpdatedDay.meals.findIndex(m => m.id === mealId);
       if (updatedMeal) {
-        const shouldSync = window.confirm(
+        const shouldSync = await confirm(
           isArabic 
             ? "لقد قمت بتعديل مكونات الوجبة. هل ترغب في تحديث ومزامنة هذا التعديل الجديد في مهام جوجل (Google Tasks)؟" 
-            : "You modified the meal ingredients. Would you like to update and sync this new change to Google Tasks?"
+            : "You modified the meal ingredients. Would you like to update and sync this new change to Google Tasks?",
+          {
+            title: isArabic ? "مزامنة التعديلات مع جوجل؟" : "Sync Changes with Google?",
+            confirmText: isArabic ? "نعم، مزامنة" : "Yes, Sync",
+            cancelText: isArabic ? "ليس الآن" : "Not now",
+            type: 'info'
+          }
         );
         if (shouldSync) {
           try {
@@ -204,11 +230,23 @@ export default function NutritionDashboard({ days, onUpdateDays, macros, profile
                 };
               });
               onUpdateDays(finalDays);
-              alert(isArabic ? "تم تحديث الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal ingredients in Google Tasks!");
+              await alert(
+                isArabic ? "تم تحديث مكونات الوجبة بنجاح في مهام جوجل!" : "Successfully updated meal ingredients in Google Tasks!",
+                {
+                  title: isArabic ? "مزامنة ناجحة" : "Sync Successful",
+                  type: 'success'
+                }
+              );
             }
           } catch (error) {
             console.error("Error syncing meal ingredients to Google Tasks:", error);
-            alert(isArabic ? "حدث خطأ أثناء المزامنة." : "Error syncing to Google Tasks.");
+            await alert(
+              isArabic ? "حدث خطأ أثناء المزامنة. يرجى المحاولة مرة أخرى." : "An error occurred during sync. Please try again.",
+              {
+                title: isArabic ? "خطأ في المزامنة" : "Sync Error",
+                type: 'error'
+              }
+            );
           }
         }
       }

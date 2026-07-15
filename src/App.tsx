@@ -9,16 +9,22 @@ import { calculateMacros, generateWorkoutPlan } from './utils/fitnessLogic';
 import OnboardingForm from './components/OnboardingForm';
 import Dashboard from './components/Dashboard';
 import GoogleTasksSync from './components/GoogleTasksSync';
-import { Sparkles, Globe, LogOut, Dumbbell, RotateCcw, User, CheckSquare } from 'lucide-react';
+import { Sparkles, Globe, Dumbbell, RotateCcw } from 'lucide-react';
+import { NotificationProvider, useNotification } from './components/NotificationProvider';
 
 const STORAGE_KEY = 'athlete_lifeos_plan';
 const LANG_KEY = 'athlete_lifeos_lang';
 
-export default function App() {
+interface AppContentProps {
+  isArabic: boolean;
+  toggleLanguage: () => void;
+}
+
+function AppContent({ isArabic, toggleLanguage }: AppContentProps) {
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
-  const [isArabic, setIsArabic] = useState<boolean>(true); // Default to Arabic as requested by user's intro
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [showTasksOnboarding, setShowTasksOnboarding] = useState<boolean>(false);
+  const { confirm } = useNotification();
 
   // Monitor page scroll position to trigger sticky transitions
   useEffect(() => {
@@ -33,7 +39,7 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Load plan and language from localStorage on mount
+  // Load plan from localStorage on mount
   useEffect(() => {
     const savedPlan = localStorage.getItem(STORAGE_KEY);
     if (savedPlan) {
@@ -42,11 +48,6 @@ export default function App() {
       } catch (e) {
         console.error("Error parsing saved athletic plan:", e);
       }
-    }
-
-    const savedLang = localStorage.getItem(LANG_KEY);
-    if (savedLang) {
-      setIsArabic(savedLang === 'ar');
     }
   }, []);
 
@@ -82,17 +83,22 @@ export default function App() {
     handleUpdatePlan(newPlan);
   };
 
-  const handleReset = () => {
-    if (window.confirm(isArabic ? "هل أنت متأكد من رغبتك في إعادة تعيين خطتك وتصميم خطة جديدة؟" : "Are you sure you want to reset your plan and start onboarding over?")) {
+  const handleReset = async () => {
+    const confirmed = await confirm(
+      isArabic 
+        ? "هل أنت متأكد من رغبتك في إعادة تعيين خطتك وتصميم خطة جديدة؟ سيؤدي ذلك إلى حذف بيانات خطتك الحالية وتفضيلاتك نهائياً." 
+        : "Are you sure you want to reset your plan and start onboarding over? This will permanently delete your current training split, nutrition, and custom progress data.",
+      {
+        title: isArabic ? "إعادة تعيين الخطة؟" : "Reset Plan?",
+        confirmText: isArabic ? "نعم، إعادة تعيين" : "Yes, Reset",
+        cancelText: isArabic ? "إلغاء" : "Cancel",
+        type: 'danger'
+      }
+    );
+    if (confirmed) {
       setPlan(null);
       localStorage.removeItem(STORAGE_KEY);
     }
-  };
-
-  const toggleLanguage = () => {
-    const nextLang = !isArabic;
-    setIsArabic(nextLang);
-    localStorage.setItem(LANG_KEY, nextLang ? 'ar' : 'en');
   };
 
   // Helper to resolve translation of split name
@@ -121,8 +127,8 @@ export default function App() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Global Navigation Header - sticky with scroll-driven layout shift */}
-      <header className={`border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-50 sticky top-0 transition-all duration-300 ${
+      {/* Global Navigation Header - fixed top-0 to guarantee it always stays visible */}
+      <header className={`fixed top-0 left-0 right-0 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-50 transition-all duration-300 ${
         isScrolled ? 'py-2 px-4 shadow-xl border-emerald-500/10' : 'py-4 px-4'
       }`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -196,7 +202,7 @@ export default function App() {
       </header>
 
       {/* Main Content Viewport */}
-      <main className="flex-grow flex flex-col items-center justify-center relative z-10 pb-16">
+      <main className="flex-grow flex flex-col items-center justify-center relative z-10 pt-[72px] md:pt-[84px] pb-16">
         {plan ? (
           <>
             <Dashboard 
@@ -236,5 +242,29 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  const [isArabic, setIsArabic] = useState<boolean>(true);
+
+  // Load language from localStorage on mount
+  useEffect(() => {
+    const savedLang = localStorage.getItem(LANG_KEY);
+    if (savedLang) {
+      setIsArabic(savedLang === 'ar');
+    }
+  }, []);
+
+  const toggleLanguage = () => {
+    const nextLang = !isArabic;
+    setIsArabic(nextLang);
+    localStorage.setItem(LANG_KEY, nextLang ? 'ar' : 'en');
+  };
+
+  return (
+    <NotificationProvider isArabic={isArabic}>
+      <AppContent isArabic={isArabic} toggleLanguage={toggleLanguage} />
+    </NotificationProvider>
   );
 }
