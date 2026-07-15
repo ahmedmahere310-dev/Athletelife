@@ -3,7 +3,6 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User,
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App
-console.log('Initializing Firebase with config:', firebaseConfig);
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
@@ -13,25 +12,21 @@ googleProvider.addScope('https://www.googleapis.com/auth/tasks');
 googleProvider.addScope('https://www.googleapis.com/auth/tasks.readonly');
 
 // In-memory caching of the access token (mandated by workspace-integration skill)
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = localStorage.getItem('googleAccessToken') || null;
 let isSigningIn = false;
 
 // Set up authentication listener
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else {
-        // If we have a user but no cached token, they might need to sign in again to capture the token,
-        // or we can prompt them when they trigger an action.
-        if (onAuthFailure) onAuthFailure();
-      }
+      // User is logged in to Firebase, even if access token is missing
+      if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem('googleAccessToken');
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -41,17 +36,13 @@ export const initAuth = (
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
-    console.log('Starting Google Sign-in...');
     const result = await signInWithPopup(auth, googleProvider);
-    console.log('Sign-in result:', result);
     const credential = GoogleAuthProvider.credentialFromResult(result);
-    console.log('Credential:', credential);
     if (!credential?.accessToken) {
-      console.error('Failed to retrieve access token from Google Auth');
       throw new Error('Failed to retrieve access token from Google Auth');
     }
     cachedAccessToken = credential.accessToken;
-    console.log('Cached access token successfully');
+    localStorage.setItem('googleAccessToken', cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error) {
     console.error('Error during Google Sign-in:', error);
@@ -65,6 +56,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 export const googleSignOut = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  localStorage.removeItem('googleAccessToken');
 };
 
 // Get current cached access token
