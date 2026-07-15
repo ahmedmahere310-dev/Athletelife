@@ -3,10 +3,9 @@
   "appId": "1:278725381609:web:9d0bff89e122d079890f78",
   "apiKey": "AIzaSyAFkrbUeRdzuZrmLVGfsZVzUL-C29Ik1ug",
   "authDomain": "athletelifeos.firebaseapp.com",
-  "databaseURL": "https://athletelifeos-default-rtdb.firebaseio.com",
   "storageBucket": "athletelifeos.firebasestorage.app",
   "messagingSenderId": "278725381609",
   "measurementId": "G-QRDYNY6Y7D",
-  "oAuthClientId": "773517306954-okhp4233te0i8bhrkmc0ck4925hdjk5i.apps.googleusercontent.com",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

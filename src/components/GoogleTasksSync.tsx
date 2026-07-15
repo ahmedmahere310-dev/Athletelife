@@ -169,6 +169,10 @@ export default function GoogleTasksSync({
     return () => unsubscribe();
   }, []);
 
+  // If connected but no token, ask to reconnect?
+  // Actually, we can just check if token is null and maybe show a "Re-connect" button
+  // in the UI instead of the tasks list.
+
   // Set default checkboxes on checklist mount or when plan changes
   useEffect(() => {
     const initialSelections: Record<string, boolean> = {};
@@ -750,7 +754,8 @@ export default function GoogleTasksSync({
       </div>
 
       {user ? (
-        <div className="space-y-6">
+        token ? (
+          <div className="space-y-6">
           {syncError && (
             <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 space-y-2">
               <div className="flex items-start gap-2.5">
@@ -969,6 +974,18 @@ export default function GoogleTasksSync({
 
         </div>
         </div>
+        ) : (
+          <div className="text-center py-10">
+            <p className="text-sm text-zinc-400 mb-4">{isArabic ? "تحتاج لإعادة ربط حساب جوجل لمزامنة المهام." : "You need to re-connect your Google account to sync tasks."}</p>
+            <button
+              onClick={handleConnect}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-zinc-950 font-semibold text-sm hover:opacity-90 active:scale-95 transition shadow-lg shadow-emerald-500/10"
+            >
+              <User size={16} />
+              <span>{isArabic ? "إعادة الربط" : "Re-connect Account"}</span>
+            </button>
+          </div>
+        )
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center max-w-sm mx-auto space-y-4">
           <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-500">

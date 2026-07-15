@@ -17,18 +17,13 @@ let isSigningIn = false;
 
 // Set up authentication listener
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else {
-        // If we have a user but no cached token, they might need to sign in again to capture the token,
-        // or we can prompt them when they trigger an action.
-        if (onAuthFailure) onAuthFailure();
-      }
+      // User is logged in to Firebase, even if access token is missing
+      if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
     } else {
       cachedAccessToken = null;
       if (onAuthFailure) onAuthFailure();
