@@ -12,7 +12,7 @@ googleProvider.addScope('https://www.googleapis.com/auth/tasks');
 googleProvider.addScope('https://www.googleapis.com/auth/tasks.readonly');
 
 // In-memory caching of the access token (mandated by workspace-integration skill)
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = localStorage.getItem('googleAccessToken') || null;
 let isSigningIn = false;
 
 // Set up authentication listener
@@ -26,6 +26,7 @@ export const initAuth = (
       if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem('googleAccessToken');
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -41,6 +42,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
       throw new Error('Failed to retrieve access token from Google Auth');
     }
     cachedAccessToken = credential.accessToken;
+    localStorage.setItem('googleAccessToken', cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error) {
     console.error('Error during Google Sign-in:', error);
@@ -54,6 +56,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 export const googleSignOut = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  localStorage.removeItem('googleAccessToken');
 };
 
 // Get current cached access token

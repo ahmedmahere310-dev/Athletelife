@@ -30,6 +30,27 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
   const [activeDayIndex, setActiveDayIndex] = useState<number>(0);
   const [completedExercises, setCompletedExercises] = useState<Record<string, boolean>>({});
   const [activeSwapExerciseId, setActiveSwapExerciseId] = useState<string | null>(null);
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    setAiAdvice(null);
+    try {
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workoutData: activeDay }),
+      });
+      const data = await response.json();
+      setAiAdvice(data.advice);
+    } catch (error) {
+      console.error("AI Analysis error:", error);
+      await alert(isArabic ? "فشل تحليل الذكاء الاصطناعي" : "AI Analysis failed");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const activeDay = days[activeDayIndex] || days[0];
 
@@ -189,6 +210,13 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
           </div>
 
           <div className="flex gap-2">
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || activeDay.isRest}
+              className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full flex items-center gap-1 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+            >
+              {isAnalyzing ? (isArabic ? "جاري التحليل..." : "Analyzing...") : (isArabic ? "تطوير بواسطة AI" : "Develop with AI")}
+            </button>
             {activeDay.isRest ? (
               <span className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-bold rounded-full">
                 {isArabic ? "استشفاء نشط" : "Recovery Mode"}
@@ -201,6 +229,13 @@ export default function WorkoutPlanner({ days, onUpdateDays, isArabic, googleTas
             )}
           </div>
         </div>
+
+        {aiAdvice && (
+          <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-4 mb-6">
+            <h4 className="text-emerald-400 text-sm font-semibold mb-2">{isArabic ? "خطة التطوير من AI:" : "AI Improvement Plan:"}</h4>
+            <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{aiAdvice}</p>
+          </div>
+        )}
 
         {/* Exercises List */}
         {activeDay.isRest ? (
